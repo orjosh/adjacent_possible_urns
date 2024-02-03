@@ -63,18 +63,13 @@ def choose_proportional(ls, sizes, n_sizes):
         raise ValueError("At least one element in `sizes` must be non-zero.")
 
     proportions = sizes.copy()
-    _calc_proportions_inplace(proportions, (0, n_sizes-1), sizes, total_size)
 
-    r = random.random() # btwn 0 and 1
-    # print("after:")
-    # print(proportions)
-    # print(f"random: {r}")
+    r = total_size * random.random()
     bin_start = 0.0
     bin_end = 0.0
     for i in range(n_sizes):
-        bin_end += proportions[i]
+        bin_end += float(proportions[i])
         if r >= bin_start and r <= bin_end:
-            # print(f"returning {ls[i]}")
             return ls[i]
         bin_start = bin_end
 
