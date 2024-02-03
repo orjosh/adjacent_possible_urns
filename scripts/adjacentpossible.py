@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import random
 import numpy as np
 from math import floor
-from datautils import choose_proportional, choose_proportional_lazy
+from datautils import choose_proportional, choose_proportional_dict
 
 @dataclass
 class UserUrn:
@@ -12,30 +12,22 @@ class UserUrn:
     ID: int
     contacts: Dict # (K,V) = (ID, count)
     n_contacts: int = 0
+    size: int = 0 # number of 'balls', different from unique n_contacts
 
     def add_contact(self, urn_id):
-        # print(f"Adding {urn_id} to {self.ID}")
         if not self.contacts:
-            # print("empty")
             self.contacts = {urn_id: 1}
             self.n_contacts += 1
         elif urn_id in self.contacts:
             # not a new contact
             self.contacts[urn_id] += 1
         else:
-            # print(f"{urn_id} not in {self.contacts}")
             self.contacts[urn_id] = 1
             self.n_contacts += 1
-            # print(f"is now {self.contacts}")
+        self.size += 1
 
     def extract_prop(self):
-        freqs = []
-        ids = []
-        for k, v in self.contacts:
-            ids.append(k)
-            freqs.append(v)
-
-        return choose_proportional(ids, freqs, self.n_contacts)
+        return choose_proportional(list(self.contacts.keys()), list(self.contacts.values()), self.size)
 
     def __eq__(self, urn):
         return len(self.contacts) == len(urn.contacts)
@@ -52,34 +44,31 @@ class AdjPosModel:
         self.reinforcement_param = reinforcement_param
         self.strategy = strategy
         self.events = []
-        self.interaction_mat = np.zeros((len(urns), len(urns)))
+        self.urn_sizes = {}
+        self.total_size = 0
         if urns is None:
             self.urns = []
         else:
             self.urns = urns
+            for u in self.urns:
+                self.urn_sizes[u.ID] = u.size
+                self.total_size += u.size
         self.n_urns = len(urns)
+        self.interaction_lookup = {}
 
         random.seed(rng_seed)
 
-    def _get_calling_urn(self, lazy=False):
-        urn_sizes = []
-        for u in self.urns:
-            urn_sizes.append(u.n_contacts) # NOTE: don't +1 to these; shouldn't select empty urns
+    def _get_calling_urn(self):
+        return choose_proportional_dict(self.urns, self.urn_sizes, self.total_size, self.n_urns)
 
-        return choose_proportional(self.urns, urn_sizes, self.n_urns)
-
-    def time_step(self, lazy=False):
+    def time_step(self):
         """
         Performs a single time step of the model according to the set strategy (WSW, by default).
         NOTE: Expects at least one urn to have a non-empty contacts dict
         """
         # get caller and receiver, store event
-        caller = self._get_calling_urn(lazy)
-        # print(f"CALLER IS {caller}")
-        unique_contact_ids = list(caller.contacts.keys())
-        unique_contact_counts = list(caller.contacts.values())
-
-        receiver_id = choose_proportional(unique_contact_ids, unique_contact_counts, caller.n_contacts)
+        caller = self._get_calling_urn()
+        receiver_id = caller.extract_prop()
         receiver = None
         for urn in self.urns:
             if urn.ID == receiver_id:
@@ -94,32 +83,45 @@ class AdjPosModel:
         for i in range(self.reinforcement_param):
             caller.add_contact(receiver.ID)
             receiver.add_contact(caller.ID)
+            self.urn_sizes[caller.ID] = caller.size
+            self.urn_sizes[receiver.ID] = receiver.size
+            self.total_size += 2
 
         # create v + 1 new nodes if receiver was empty
         if receiver_is_empty:
             for i in range(self.novelty_param + 1):
                 new_urn = UserUrn(len(self.urns) + 1, {})
                 self.urns.append(new_urn)
+                self.urn_sizes[new_urn.ID] = 0
                 self.n_urns += 1
                 receiver.add_contact(new_urn.ID)
-                # print(f"Added {new_urn.ID} to {receiver.ID}")
+                self.urn_sizes[receiver.ID] = receiver.size
+                self.total_size += 1
 
         # novelty step, strategy called here
-        # print(f"looking for ({caller.ID}, {receiver.ID}) in {self.events}")
-        if (caller.ID, receiver.ID) not in self.events \
-            and (receiver.ID, caller.ID) not in self.events: # TODO not efficient, replace with interaction matrix version
+        lower = None
+        higher = None
+        if caller.ID < receiver.ID:
+            lower = caller.ID
+            higher = receiver.ID
+        else:
+            lower = receiver.ID
+            higher = caller.ID
+
+        if self.interaction_lookup.get((lower, higher)) is None:
             # novelty only occurs if urns never interacted before
-            # print(f"{caller.ID} and {receiver.ID} never interacted bvefore")
             if self.strategy == "WSW":
                 self._do_WSW(caller, receiver)
             else:
                 raise ValueError(f"'{self.strategy}' is not a valid strategy.")
 
+        # store event
         self.events.append((caller.ID, receiver.ID))
 
+        # also store in lookup table (for performance)
+        self.interaction_lookup[(lower, higher)] = 1
+
     def _do_WSW(self, caller, receiver):
-        # print(f"WSW with C {caller.ID} R {receiver.ID}")
-        # print(f"\tC: {caller.contacts}\n\tR: {receiver.contacts}")
         # NOTE we copy all these things as they are now, so that novel urns which
         # are about to be added cannot be chosen accidentally
         caller_ids = list(caller.contacts.keys())
@@ -133,7 +135,6 @@ class AdjPosModel:
         # Choose v+1 unique IDs from caller, add to receiver
         num_iter = self.novelty_param + 1
         novel_options = list(set(caller_contacts.keys()) - set(receiver_contacts.keys())) # complement
-        # print(f"C - R = {novel_options}")
         if len(novel_options) == 1:
             # TODO hacky fix, is something broken? Without this, sometimes the only novelty to give an urn is itself
             num_iter = 0
@@ -146,14 +147,12 @@ class AdjPosModel:
         for i in range(num_iter):
             drawn_id = receiver.ID
             while drawn_id is receiver.ID or drawn_id in list(receiver_contacts.keys()):
-                # print("C drawing")
-                # print(f"\t iter {i}/{num_iter}")
-                # print(f"\tR ({receiver.ID}): {receiver_ids}\n\tC ({caller.ID}): {caller_ids}")
-                # print(f"\tComplement: {list(set(caller_ids) - set(receiver_ids))}")
                 drawn_id = choose_proportional(list(caller_contacts.keys()), \
                     list(caller_contacts.values()), caller_len)
             # otherwise,
             receiver.add_contact(drawn_id)
+            self.urn_sizes[receiver.ID] = receiver.size
+            self.total_size += 1
             caller_contacts.pop(drawn_id)
             caller_len -= 1
 
@@ -161,7 +160,6 @@ class AdjPosModel:
         caller_contacts = caller.contacts.copy()
         num_iter = self.novelty_param + 1
         novel_options = list(set(receiver_contacts.keys()) - set(caller_contacts.keys())) # complement of both sets
-        # print(f"R - C = {novel_options}")
         if len(novel_options) == 1:
             # TODO hacky fix, see above
             num_iter = 0
@@ -174,14 +172,12 @@ class AdjPosModel:
         for i in range(num_iter):
             drawn_id = receiver.ID
             while drawn_id is caller.ID or drawn_id in list(caller_contacts.keys()):
-                # print("R drawing")
-                # print(f"\t iter {i}/{num_iter}")
-                # print(f"\tR ({receiver.ID}): {receiver_ids}\n\tC ({caller.ID}): {caller_ids}")
-                # print(f"\tComplement: {novel_options}")
                 drawn_id = choose_proportional(list(receiver_contacts.keys()), \
                     list(receiver_contacts.values()), receiver_len)
             # otherwise,
             caller.add_contact(drawn_id)
+            self.urn_sizes[caller.ID] = caller.size
+            self.total_size += 1
             receiver_contacts.pop(drawn_id)
             receiver_len -= 1
 
