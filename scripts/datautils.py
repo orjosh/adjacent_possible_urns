@@ -55,6 +55,7 @@ def choose_proportional(ls, sizes, n_sizes):
 
     NOTE: `ls` and `sizes` must be one-to-one, i.e. `ls[i]` has a size of `sizes[i]`
     '''
+    print(f"Got:\n\tls: {ls}\n\tsizes: {sizes}\n\tn_sizes: {n_sizes}")
     total_size = 0
     for val in sizes:
         total_size += val
@@ -65,12 +66,18 @@ def choose_proportional(ls, sizes, n_sizes):
     proportions = sizes.copy()
 
     r = total_size * random.random()
+    print(f"Random: {r}")
     bin_start = 0.0
     bin_end = 0.0
+    temp = 0
     for i in range(n_sizes):
-        bin_end += float(proportions[i])
+        temp = float(proportions[i])
+        if temp == 0: # skip zero-weighted entries
+            continue
+        bin_end += temp
         if r >= bin_start and r <= bin_end:
-            return ls[i]
+            print(f"Returning (id: {ls[i]}, i: {i})")
+            return (ls[i], i)
         bin_start = bin_end
 
 def choose_proportional_multithread(ls, sizes, n_sizes, max_workers=1):
