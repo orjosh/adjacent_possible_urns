@@ -3,6 +3,7 @@ import random
 import concurrent.futures
 import functools
 from math import floor, log, sqrt
+from typing import Dict
 
 def power_law_distributed_rng(n, x_min, scale, seed=None):
     # This algorithm is taken from Appendix D in Clauset et al's"Power Law Distributions
@@ -41,30 +42,22 @@ def discrete_power_mle_approx(data, x_min_index):
     x_min = data[x_min_index]
     return continuous_power_mle(data[x_min_index:], x_min-0.5)
 
-def choose_proportional_dict(ls, sizes_dict, total_size, n_sizes):
+def choose_proportional_dict(d: Dict, total_size):
     '''
-    Randomly chooses and returns an element from the list `ls` proportional to its
-    size as determined by the corresponding index in `sizes`. In other words, draw
-    an element of `ls` out of a hat, where each `ls[i]` has `sizes[i]` entries
-    in the draw.
-
-    NOTE: `ls` and `sizes` must be one-to-one, i.e. `ls[i]` has a size of `sizes[i]`
     '''
 
+    #print(f"CP got {d}")
     if total_size == 0:
         raise ValueError("At least one element in `sizes` must be non-zero.")
 
     r = total_size * random.random()
+    #print(f"r = {r}")
     bin_start = 0.0
     bin_end = 0.0
-    temp = 0
-    for i in range(1, n_sizes+1):
-        temp = float(sizes_dict[i])
-        if temp == 0: # skip zero-weighted entries
-            continue
-        bin_end += temp
-        if r >= bin_start and r <= bin_end:
-            return ls[i-1]
+    for k,v in d.items():
+        bin_end += v
+        if bin_end >= r >= bin_start:
+            return k
         bin_start = bin_end
         
 
