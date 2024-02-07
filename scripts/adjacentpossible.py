@@ -59,33 +59,25 @@ class AdjPosModel:
         caller_id = choose_proportional_dict(self.urn_sizes, self.total_size)
         return self.urns[caller_id-1]
 
-    def _do_strat_WSW(self, urn_a, urn_b):
-        # NOTE we copy all these things as they are now, so that novel urns which
-        # are about to be added cannot be chosen accidentally
-        urn_a_contacts = urn_a.contacts.copy()
-        #print(f"Urn A: {urn_a}")
-        #print(f"Urn B: {urn_b}")
-
+    def _do_strat_WSW(self, urn_a, urn_b, urn_a_contacts, urn_a_size):
         # Choose v+1 unique IDs from urn A, add to urn B
+        urn_a_size -= urn_a_contacts[urn_b.ID]
         urn_a_contacts.pop(urn_b.ID)
-        n_unique_left = urn_a.n_contacts - 1 # because we removed B's ID which we can't share to B
         num_iter = self.novelty_param + 1
-        #print(f"{n_unique_left} vs. {num_iter}")
-        if(n_unique_left < num_iter):
-            #print(f"{n_unique_left} vs. {num_iter}")
+        if(urn_a.n_contacts - 1 < num_iter): # may only contain v IDs, not including urn B's ID
             num_iter -= 1
         
         for i in range(num_iter):
-            #print(f"iter {i+1}/{num_iter}\nLeft: {urn_a_contacts} (n={n_unique_left})")
-            drawn_id = choose_proportional_dict(urn_a_contacts, n_unique_left)
+            # print(f"iter {i+1}/{num_iter}\nHave: {urn_a_contacts} of size {urn_a_size} (vs. {sum(list(urn_a_contacts.values()))})")
+            drawn_id = choose_proportional_dict(urn_a_contacts, urn_a_size)
 
             # otherwise,
-            #print(f"drew {drawn_id}")
             urn_b.add_contact(drawn_id)
             self.urn_sizes[urn_b.ID] = urn_b.size
             self.total_size += 1
+
+            urn_a_size -= urn_a_contacts[drawn_id]
             urn_a_contacts.pop(drawn_id)
-            n_unique_left -= 1
 
     def _do_reinforcement(self, caller, receiver):
         for i in range(self.reinforcement_param):
@@ -146,13 +138,18 @@ class AdjPosModel:
                 receiver = urn
                 break
 
-        #print(f"C: {caller}, R: {receiver}")
         is_first_interaction = self._do_novelty(caller, receiver)
-        self._do_reinforcement(caller, receiver) 
+        self._do_reinforcement(caller, receiver)
+
         if is_first_interaction:
             if self.strategy == "WSW":
-                self._do_strat_WSW(caller, receiver)
-                self._do_strat_WSW(receiver, caller)
+                caller_contacts_before = caller.contacts.copy()
+                caller_size_before = caller.size
+                receiver_contacts_before = receiver.contacts.copy()
+                receiver_size_before = receiver.size
+
+                self._do_strat_WSW(caller, receiver, caller_contacts_before, caller_size_before)
+                self._do_strat_WSW(receiver, caller, receiver_contacts_before, receiver_size_before)
 
         # store event
         self.events.append((caller.ID, receiver.ID))

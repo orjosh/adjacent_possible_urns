@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 
 sys.path.append("scripts/")
 
-sequence_df = pd.read_csv("adjpos_E01_2.csv")
+sequence_df = pd.read_csv("adjpos_E01_test.csv")
 callers = sequence_df["caller"]
 receivers = sequence_df["receiver"]
 
@@ -44,5 +44,5 @@ plt.xlabel("t")
 plt.yscale('log')
 plt.xscale('log')
 plt.xlim([10**2, 10**6])
-plt.ylim([10, 10**6])
+plt.ylim([10**2, 10**6])
 plt.show()
