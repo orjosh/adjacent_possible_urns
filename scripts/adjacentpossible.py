@@ -27,7 +27,7 @@ class UserUrn:
         self.size += 1
 
     def extract_prop(self):
-        return choose_proportional(list(self.contacts.keys()), list(self.contacts.values()), self.size)
+        return choose_proportional_dict(self.contacts, self.size)
 
     def __eq__(self, urn):
         return len(self.contacts) == len(urn.contacts)
@@ -59,68 +59,7 @@ class AdjPosModel:
         caller_id = choose_proportional_dict(self.urn_sizes, self.total_size)
         return self.urns[caller_id-1]
 
-    def time_step(self):
-        """
-        Performs a single time step of the model according to the set strategy (WSW, by default).
-        NOTE: Expects at least one urn to have a non-empty contacts dict
-        """
-        # get caller and receiver, store event
-        caller = self._get_calling_urn()
-        receiver_id = caller.extract_prop()
-        receiver = None
-        for urn in self.urns:
-            if urn.ID == receiver_id:
-                receiver = urn
-                break
-
-        # reinforcement step
-        receiver_is_empty = False
-        if receiver.n_contacts == 0: # so we can do novelty step
-            receiver_is_empty = True
-
-        for i in range(self.reinforcement_param):
-            caller.add_contact(receiver.ID)
-            receiver.add_contact(caller.ID)
-            self.urn_sizes[caller.ID] = caller.size
-            self.urn_sizes[receiver.ID] = receiver.size
-            self.total_size += 2
-
-        # create v + 1 new nodes if receiver was empty
-        if receiver_is_empty:
-            for i in range(self.novelty_param + 1):
-                new_urn = UserUrn(len(self.urns) + 1, {})
-                self.urns.append(new_urn)
-                self.urn_sizes[new_urn.ID] = 0
-                self.n_urns += 1
-                receiver.add_contact(new_urn.ID)
-                self.urn_sizes[receiver.ID] = receiver.size
-                self.total_size += 1
-
-        # novelty step, strategy called here
-        lower = None
-        higher = None
-        if caller.ID < receiver.ID:
-            lower = caller.ID
-            higher = receiver.ID
-        else:
-            lower = receiver.ID
-            higher = caller.ID
-
-        if self.interaction_lookup.get((lower, higher)) is None:
-            # novelty only occurs if urns never interacted before
-            if self.strategy == "WSW":
-                self._do_WSW(caller, receiver)
-                self._do_WSW(receiver, caller)
-            else:
-                raise ValueError(f"'{self.strategy}' is not a valid strategy.")
-
-        # store event
-        self.events.append((caller.ID, receiver.ID))
-
-        # also store in lookup table (for performance)
-        self.interaction_lookup[(lower, higher)] = 1
-
-    def _do_WSW(self, urn_a, urn_b):
+    def _do_strat_WSW(self, urn_a, urn_b):
         # NOTE we copy all these things as they are now, so that novel urns which
         # are about to be added cannot be chosen accidentally
         urn_a_contacts = urn_a.contacts.copy()
@@ -148,130 +87,72 @@ class AdjPosModel:
             urn_a_contacts.pop(drawn_id)
             n_unique_left -= 1
 
-    def _do_WSW_old1(self, caller, receiver):
-        # NOTE we copy all these things as they are now, so that novel urns which
-        # are about to be added cannot be chosen accidentally
-        caller_ids = list(caller.contacts.keys())
-        receiver_ids = list(receiver.contacts.keys())
-
-        caller_contacts = caller.contacts.copy()
-        caller_len = caller.n_contacts
-        receiver_contacts = receiver.contacts.copy()
-        receiver_len = receiver.n_contacts
-
-        # Choose v+1 unique IDs from caller, add to receiver
-        #print(f"Caller is {caller}")
-        #print(f"Receiver is {receiver}")
-        num_iter = self.novelty_param + 1
-        novel_ids = list(set(caller_contacts.keys()) - set(receiver_contacts.keys())) # complement
-        num_novel = len(novel_ids)   
-        if num_novel == 1:
-            # TODO hacky fix, is something broken? Without this, sometimes the only novelty to give an urn is itself
-            num_iter = 0
-        elif num_novel - 1 < self.novelty_param + 1:
-            # Supplementary notes say that we pick only v distinct IDs if urn i
-            # would otherwise have to give a copy of urn j to urn j itself
-            num_iter -= 1
-        
-        novel_counts = []
-        for u in novel_ids:
-            print(f"Have {u}, has count {caller_contacts[u]} in {caller}")
-            novel_counts.append(caller_contacts[u])
-
-        novel_options = dict(zip(novel_ids, novel_counts))       
-        
-        for i in range(num_iter):
-            print(f"iter {i+1}/{num_iter}")
-            print(f"Options: {novel_options}")
-            drawn_id = receiver.ID
-            while drawn_id is receiver.ID or drawn_id in list(receiver_contacts.keys()):
-                drawn_id = choose_proportional_dict(novel_options, num_novel)
-                #print(f"Drew {drawn_id}")
-            # otherwise,
-            receiver.add_contact(drawn_id)
-            self.urn_sizes[receiver.ID] = receiver.size
-            self.total_size += 1
-            novel_options.pop(drawn_id)
-            num_novel -= 1
-
-        # The same but from receiver, adding to caller
-        caller_contacts = caller.contacts.copy()
-        num_iter = self.novelty_param + 1
-        novel_ids = list(set(receiver_contacts.keys()) - set(caller_contacts.keys())) # complement
-        num_novel = len(novel_ids)   
-        if num_novel == 1:
-            # TODO hacky fix, is something broken? Without this, sometimes the only novelty to give an urn is itself
-            num_iter = 0
-        elif num_novel - 1 < self.novelty_param + 1:
-            # Supplementary notes say that we pick only v distinct IDs if urn i
-            # would otherwise have to give a copy of urn j to urn j itself
-            num_iter -= 1
-        
-        novel_sizes = []
-        for u in novel_ids:
-            novel_sizes.append(self.urn_sizes[u])
-
-        novel_options = dict(zip(novel_ids, novel_sizes))
-        
-        for i in range(num_iter):
-            print(f"iter {i+1}/{num_iter}")
-            drawn_id = receiver.ID
-            while drawn_id is caller.ID or drawn_id in list(caller_contacts.keys()):
-                drawn_id = choose_proportional_dict(novel_options, num_novel)
-                #print(f"Drew {drawn_id}")
-            # otherwise,
-            #print(f"(R) DREW {drawn_id}\t iter {i+1}/{num_iter}")
-            caller.add_contact(drawn_id)
+    def _do_reinforcement(self, caller, receiver):
+        for i in range(self.reinforcement_param):
+            caller.add_contact(receiver.ID)
+            receiver.add_contact(caller.ID)
             self.urn_sizes[caller.ID] = caller.size
-            self.total_size += 1
-            novel_options.pop(drawn_id)
-            num_novel -= 1
+            self.urn_sizes[receiver.ID] = receiver.size
+            self.total_size += 2
 
-    def _do_WSW_old(self, caller, receiver):
-        # print(f"WSW with C {caller} R {receiver}")
-        # NOTE we copy all these things as they are now, so that novel urns which
-        # are about to be added cannot be chosen accidentally
-        caller_ids = list(caller.contacts.keys())
-        caller_counts = list(caller.contacts.values())
-        caller_len = caller.n_contacts
-        receiver_ids = list(receiver.contacts.keys())
-        receiver_counts = list(receiver.contacts.values())
-        receiver_len = receiver.n_contacts
+    def _do_novelty(self, caller, receiver):
+        """
+        Performs the novelty step.
 
-        # choose v + 1 unique IDs proportionally from caller, add to receiver
-        already_chosen = []
+        Returns `True` if this is a first-time interaction and thus whether the strategy step
+        should take place.
+        """
+        # create v + 1 new nodes if receiver was empty
+        if receiver.n_contacts == 0:
+            for i in range(self.novelty_param + 1):
+                new_urn = UserUrn(len(self.urns) + 1, {})
+                self.urns.append(new_urn)
+                self.urn_sizes[new_urn.ID] = 0
+                self.n_urns += 1
+                receiver.add_contact(new_urn.ID)
+                self.urn_sizes[receiver.ID] = receiver.size
+                self.total_size += 1
 
-        if(len(caller_ids) - 1 < self.novelty_param + 1):
-            # - 1 because caller_ids contains the receiver too
-            raise ValueError(f"Caller ID {caller.ID} doesn't contain enough contacts to meet novelty requirement.")
-        
-        for i in range(self.novelty_param + 1):
-            drawn_id = receiver.ID
-            while drawn_id == receiver.ID or drawn_id in already_chosen \
-                or drawn_id in receiver_ids:
-                # must pick a unique ID each time, and also can't give an
-                # urn its own ID
-                #print(f"C{i}: {caller_ids} with sizes {caller_counts} and length {caller_len}")
-                #print(f"R has {receiver_ids}, already chose {already_chosen}")
-                drawn_id = choose_proportional(caller_ids, caller_counts, caller_len)
-                #print(f"Drew {drawn_id}")
+        # check if first-time interaction
+        lower = None
+        higher = None
+        if caller.ID < receiver.ID:
+            lower = caller.ID
+            higher = receiver.ID
+        else:
+            lower = receiver.ID
+            higher = caller.ID
 
-            receiver.add_contact(drawn_id)
-            already_chosen.append(drawn_id)
+        if self.interaction_lookup.get((lower, higher)) is None:
+            self.interaction_lookup[(lower, higher)] = 1
+            return True
 
-        # vice versa
-        already_chosen = []
+    def time_step(self, start_extension=None, end_extension=None):
+        """
+        Performs a single time step of the model according to the set strategy (WSW, by default).
+        NOTE: Expects at least one urn to have a non-empty contacts dict.
 
-        # TODO does receiver_ids necessarily contain caller? Do we need that -1?
-        if(len(receiver_ids) - 1 < self.novelty_param + 1):
-            raise ValueError(f"Receiver ID {receiver.ID} doesn't contain enough contacts to meet novelty requirement.")
+        Model extensions can be added through the `start_extension` and `end_extension` parameters,
+        which are function objects that are called at the start (before reinforcement, novelty,
+        and strategy steps) and end (after reinforcement, novelty, and strategy steps)
+        respectively.
+        """
+        # choose caller and receiver
+        caller = self._get_calling_urn()
+        receiver_id = caller.extract_prop()
+        receiver = None
+        for urn in self.urns:
+            if urn.ID == receiver_id:
+                receiver = urn
+                break
 
-        for i in range(self.novelty_param + 1):
-            drawn_id = caller.ID
-            while drawn_id == caller.ID or drawn_id in already_chosen \
-                or drawn_id in caller_ids:
-                print(f"R{i}: {receiver_ids} with sizes {receiver_counts} and length {receiver_len}")
-                drawn_id = choose_proportional(receiver_ids, receiver_counts, receiver_len)
+        #print(f"C: {caller}, R: {receiver}")
+        is_first_interaction = self._do_novelty(caller, receiver)
+        self._do_reinforcement(caller, receiver) 
+        if is_first_interaction:
+            if self.strategy == "WSW":
+                self._do_strat_WSW(caller, receiver)
+                self._do_strat_WSW(receiver, caller)
 
-            caller.add_contact(drawn_id)
-            already_chosen.append(drawn_id)
+        # store event
+        self.events.append((caller.ID, receiver.ID))

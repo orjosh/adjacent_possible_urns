@@ -56,7 +56,7 @@ def choose_proportional_dict(d: Dict, total_size):
     bin_end = 0.0
     for k,v in d.items():
         bin_end += v
-        if bin_end >= r >= bin_start:
+        if bin_start <= r <= bin_end:
             return k
         bin_start = bin_end
         
