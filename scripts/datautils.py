@@ -58,26 +58,3 @@ def choose_proportional_dict(d: Dict, total_size):
             # print(f"returning {k}")
             return k
         bin_start = bin_end
-        
-
-def choose_proportional(ls, sizes, list_len, total_size):
-    '''
-    Randomly chooses and returns an element from the list `ls` proportional to its
-    size as determined by the corresponding index in `sizes`. In other words, draw
-    an element of `ls` out of a hat, where each `ls[i]` has `sizes[i]` entries
-    in the draw.
-
-    NOTE: `ls` and `sizes` must be one-to-one, i.e. `ls[i]` has a size of `sizes[i]`
-    '''
-
-    if total_size == 0:
-        raise ValueError("At least one element in `sizes` must be non-zero.")
-
-    r = total_size * random.random()
-    bin_start = 0.0
-    bin_end = 0.0
-    for i in range(list_len):
-        bin_end += sizes[i]
-        if bin_start <= r <= bin_end:
-            return ls[i]
-        bin_start = bin_end

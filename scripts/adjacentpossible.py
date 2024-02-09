@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import random
 import numpy as np
 from math import floor
-from datautils import choose_proportional, choose_proportional_dict
+from datautils import choose_proportional_dict
 
 @dataclass
 class UserUrn:
@@ -29,15 +29,6 @@ class UserUrn:
     def extract_prop(self):
         return choose_proportional_dict(self.contacts, self.size)
 
-    def __eq__(self, urn):
-        return len(self.contacts) == len(urn.contacts)
-
-    def __lt__(self, urn):
-        return len(self.contacts) < len(urn.contacts)
-
-    def __gt__(self, urn):
-        return len(self.contacts) > len(urn.contacts)
-
 class AdjPosModel:
     def __init__(self, rng_seed=None, novelty_param=1, reinforcement_param=2, strategy="WSW", urns=[]):
         self.novelty_param = novelty_param
@@ -47,17 +38,27 @@ class AdjPosModel:
         self.urn_sizes = {}
         self.total_size = 0
         self.urns = urns
+        self.n_urns = len(urns)
+        self.interaction_lookup = {}
+        self.prop_choice = []
+
         for u in self.urns:
             self.urn_sizes[u.ID] = u.size
             self.total_size += u.size
-        self.n_urns = len(urns)
-        self.interaction_lookup = {}
+            for i in range(u.size):
+                self.prop_choice.append(u.ID)
+
+        print(self.prop_choice)
+        print(f"ID 1 is {self.prop_choice.count(1)}/{len(self.prop_choice)}")
+        print(f"Or {self.prop_choice.count(1)/len(self.prop_choice):.2f}")
 
         random.seed(rng_seed)
 
     def _get_calling_urn(self):
-        caller_id = choose_proportional_dict(self.urn_sizes, self.total_size)
-        # print(f"Got {caller_id}, returning {self.urns[caller_id-1].ID}")
+        r = random.randint(0, self.total_size-1)
+        #caller_id = choose_proportional_dict(self.urn_sizes, self.total_size)
+        # print(f"returning {self.prop_choice[r]}")
+        caller_id = self.prop_choice[r]
         return self.urns[caller_id-1]
 
     def _do_strat_WSW(self, urn_a, urn_b, urn_a_contacts, urn_a_size):
@@ -75,6 +76,7 @@ class AdjPosModel:
             # otherwise,
             urn_b.add_contact(drawn_id)
             self.urn_sizes[urn_b.ID] = urn_b.size
+            self.prop_choice.append(urn_b.ID)
             self.total_size += 1
 
             urn_a_size -= urn_a_contacts[drawn_id]
@@ -84,8 +86,13 @@ class AdjPosModel:
         for i in range(self.reinforcement_param):
             caller.add_contact(receiver.ID)
             receiver.add_contact(caller.ID)
+
             self.urn_sizes[caller.ID] = caller.size
+            self.prop_choice.append(caller.ID)
+
             self.urn_sizes[receiver.ID] = receiver.size
+            self.prop_choice.append(receiver.ID)
+
             self.total_size += 2
 
     def _do_novelty(self, caller, receiver):
@@ -104,6 +111,7 @@ class AdjPosModel:
                 self.n_urns += 1
                 receiver.add_contact(new_urn.ID)
                 self.urn_sizes[receiver.ID] = receiver.size
+                self.prop_choice.append(receiver.ID)
                 self.total_size += 1
 
         # check if first-time interaction
