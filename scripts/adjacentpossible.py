@@ -57,6 +57,7 @@ class AdjPosModel:
 
     def _get_calling_urn(self):
         caller_id = choose_proportional_dict(self.urn_sizes, self.total_size)
+        # print(f"Got {caller_id}, returning {self.urns[caller_id-1].ID}")
         return self.urns[caller_id-1]
 
     def _do_strat_WSW(self, urn_a, urn_b, urn_a_contacts, urn_a_size):
