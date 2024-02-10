@@ -33,14 +33,17 @@ def continuous_power_mle(data, x_min):
     exponent = 1 + n/sumfactor
     err = (exponent - 1)/sqrt(n)
 
-    return -1*exponent, err
+    return exponent, err
 
 def discrete_power_mle_approx(data, x_min_index):
     '''
-    Expects `data` to be in decreasing order. Returns an estimate of the scaling parameter.
+    Expects `data` to be in increasing order. Returns an estimate of the scaling parameter.
     '''
+    # Clauset et al
     x_min = data[x_min_index]
-    return continuous_power_mle(data[x_min_index:], x_min-0.5)
+    data_rev = data[x_min_index:].copy()
+    data_rev.reverse()
+    return continuous_power_mle(data_rev, x_min-0.5)
 
 def choose_proportional_dict(d: Dict, total_size):
     '''

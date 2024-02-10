@@ -40,7 +40,7 @@ class AdjPosModel:
         self.urns = urns
         self.n_urns = len(urns)
         self.interaction_lookup = {}
-        self.prop_choice = []
+        self.prop_choice = [] # for performance in _get_calling_urn()
 
         for u in self.urns:
             self.urn_sizes[u.ID] = u.size
@@ -48,16 +48,14 @@ class AdjPosModel:
             for i in range(u.size):
                 self.prop_choice.append(u.ID)
 
-        print(self.prop_choice)
-        print(f"ID 1 is {self.prop_choice.count(1)}/{len(self.prop_choice)}")
-        print(f"Or {self.prop_choice.count(1)/len(self.prop_choice):.2f}")
+        # print(self.prop_choice)
+        # print(f"ID 1 is {self.prop_choice.count(1)}/{len(self.prop_choice)}")
+        # print(f"Or {self.prop_choice.count(1)/len(self.prop_choice):.2f}")
 
         random.seed(rng_seed)
 
     def _get_calling_urn(self):
         r = random.randint(0, self.total_size-1)
-        #caller_id = choose_proportional_dict(self.urn_sizes, self.total_size)
-        # print(f"returning {self.prop_choice[r]}")
         caller_id = self.prop_choice[r]
         return self.urns[caller_id-1]
 
@@ -141,11 +139,11 @@ class AdjPosModel:
         # choose caller and receiver
         caller = self._get_calling_urn()
         receiver_id = caller.extract_prop()
-        receiver = None
-        for urn in self.urns:
-            if urn.ID == receiver_id:
-                receiver = urn
-                break
+        receiver = self.urns[receiver_id-1]
+        # for urn in self.urns:
+        #     if urn.ID == receiver_id:
+        #         receiver = urn
+        #         break
 
         is_first_interaction = self._do_novelty(caller, receiver)
         self._do_reinforcement(caller, receiver)
