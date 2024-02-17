@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from adjacentpossible import AdjPosModel, UserUrn
 from datautils import discrete_power_mle_approx
 
-data_path = "M1_E1_2.csv"
+data_path = "M1_E1.csv"
 
 if not exists(data_path):
     # Model Setup
