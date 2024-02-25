@@ -2,6 +2,8 @@ import numpy as np
 import random
 import concurrent.futures
 import functools
+import pandas as pd
+import networkx as nx
 from math import floor, log, sqrt
 from typing import Dict
 
@@ -49,6 +51,7 @@ def choose_proportional_dict(d: Dict, total_size):
     '''
     '''
     if total_size == 0:
+        print(d)
         raise ValueError("At least one element in `sizes` must be non-zero.")
 
     r = total_size * random.random()
@@ -61,3 +64,25 @@ def choose_proportional_dict(d: Dict, total_size):
             # print(f"returning {k}")
             return k
         bin_start = bin_end
+
+# Network analysis --------------------------------------------------------------------------------
+def csv_to_graph(csv_path):
+    """
+    Takes a csv file representing a network/graph and returns a NetworkX Graph
+    representation of it. The csv file must contain the two columns 'caller'
+    and 'receiver' whose rows depict an edge (c, r).
+    """
+
+    df = pd.read_csv(csv_path)
+    callers = df['caller']
+    receivers = df['receiver']
+
+    edges = []
+    for i,c in enumerate(callers):
+        r = receivers.iloc[i]
+        edges.append((c,r))
+
+    G = nx.Graph()
+    G.add_edges_from(edges)
+
+    return G

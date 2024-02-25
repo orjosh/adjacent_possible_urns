@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import random
 import numpy as np
 from math import floor
-from datautils import choose_proportional_dict
+from analysisfuncs import choose_proportional_dict
 
 @dataclass
 class UserUrn:
@@ -59,15 +59,17 @@ class AdjPosModel:
         return self.prop_choice[r]
 
     def _do_strat_WSW(self, urn_a, urn_b, urn_a_contacts, urn_a_size):
+        # print(f"Got A: {urn_a}\nB: {urn_b}")
+
         # Choose v+1 unique IDs from urn A, add to urn B
         urn_a_size -= urn_a_contacts[urn_b.ID]
         urn_a_contacts.pop(urn_b.ID)
         num_iter = self.novelty_param + 1
-        if(urn_a.n_contacts - 1 < num_iter): # may only contain v IDs, not including urn B's ID
+        if(len(urn_a_contacts) - 1 < num_iter): # may only contain v IDs, not including urn B's ID
             num_iter -= 1
         
         for i in range(num_iter):
-            # print(f"iter {i+1}/{num_iter}\nHave: {urn_a_contacts} of size {urn_a_size} (vs. {sum(list(urn_a_contacts.values()))})")
+            #print(f"iter {i+1}/{num_iter}\nHave: {urn_a_contacts} of size {urn_a.n_contacts} (vs. {len(urn_a_contacts)})")
             drawn_id = choose_proportional_dict(urn_a_contacts, urn_a_size)
 
             # otherwise,
@@ -125,7 +127,8 @@ class AdjPosModel:
             self.interaction_lookup[(lower, higher)] = 1
             return True
 
-    def time_step(self, begin_ext=None, mid_ext=None, strat_ext=None, end_ext=None, alt_reinforcement=None):
+    def time_step(self, begin_ext=None, mid_ext=None, strat_ext=None, end_ext=None, \
+        alt_reinforcement=None, alt_novelty=None):
         """
         Performs a single time step of the model according to the set strategy (WSW, by default).
         NOTE: Expects at least one urn to have a non-empty contacts dict.
@@ -147,12 +150,17 @@ class AdjPosModel:
         receiver_id = caller.extract_prop()
         receiver = self.urns[receiver_id-1]
 
+        # print(f"Caller: {caller_id}, receiver: {receiver_id}")
+
         if begin_ext:
-            caller_id, receiver_id = begin_ext(caller, receiver)
+            caller_id, receiver_id = begin_ext(self, caller, receiver)
             caller = self.urns[caller_id-1]
             receiver = self.urns[receiver_id-1]
 
-        is_first_interaction = self.do_novelty(caller, receiver)
+        if alt_novelty:
+            is_first_interaction = alt_novelty(self, caller, receiver)
+        else:
+            is_first_interaction = self.do_novelty(caller, receiver)
 
         if alt_reinforcement:
             alt_reinforcement(self, caller, receiver)
