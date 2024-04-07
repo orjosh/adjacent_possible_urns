@@ -7,16 +7,18 @@ from matplotlib import pyplot as plt
 from os.path import exists
 
 experiment_tag = "M1_E1"
-data_path = experiment_tag + ".csv"
+data_path = "generated_data/" + experiment_tag + ".csv"
 
 data = pd.read_csv(data_path)
 
 num_urns = data["num_urns"].iloc[-1]
+num_urns_t = data["num_urns"] # at model time t
 event_callers = data["caller"]
 event_receivers = data["receiver"]
 
-pickle_filename_indegree = experiment_tag + "_in_deg.pickle"
+pickle_filename_indegree = "generated_data/" + experiment_tag + "_in_deg.pickle"
 in_degrees = {}
+in_deg_avg_t = []
 if not exists(pickle_filename_indegree):
     seen_edges = {}
     for i,c in enumerate(event_callers):
@@ -32,12 +34,21 @@ if not exists(pickle_filename_indegree):
             
             seen_edges[e] = 1
 
+        avg = 0
+        for d in in_degrees.values():
+            avg += d
+
+        avg = avg/num_urns_t.iloc[i]
+        print(f"Avg is {avg}")
+
+        in_deg_avg_t.append(avg)
+
         print(f"Iteration {i}")
 
     with open(pickle_filename_indegree, 'wb') as f:
         pickle.dump(in_degrees, f)
 
-pickle_filename_outdegree = experiment_tag + "_out_deg.pickle"
+pickle_filename_outdegree = "generated_data/" + experiment_tag + "_out_deg.pickle"
 out_degrees = {}
 if not exists(pickle_filename_outdegree):
     seen_edges = {}
@@ -65,16 +76,18 @@ with open(pickle_filename_indegree, 'rb') as f:
 with open(pickle_filename_outdegree, 'rb') as f:
     out_degrees = pickle.load(f)
 
-in_degrees_values = list(in_degrees.values())
-in_degrees_values.sort()
+# in_degrees_values = list(in_degrees.values())
+# in_degrees_values.sort()
 
-out_degrees_values = list(out_degrees.values())
-out_degrees_values.sort()
+# out_degrees_values = list(out_degrees.values())
+# out_degrees_values.sort()
 
-fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+# fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
 
-axs[0].hist(in_degrees_values, bins=15, log=True)
-axs[1].hist(out_degrees_values, bins=15, log=True)
-plt.ylabel("Count")
-# axs[0].xlabel("$k_{in}$")
+# axs[0].hist(in_degrees_values, bins=15, log=True)
+# axs[1].hist(out_degrees_values, bins=15, log=True)
+# plt.ylabel("Count")
+# # axs[0].xlabel("$k_{in}$")
+
+plt.plot(in_deg_avg_t)
 plt.show()

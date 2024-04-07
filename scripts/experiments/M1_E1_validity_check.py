@@ -8,9 +8,9 @@ import numpy as np
 from os.path import exists
 from matplotlib import pyplot as plt
 from adjacentpossible import AdjPosModel, UserUrn
-from datautils import discrete_power_mle_approx
+from analysisfuncs import discrete_power_mle_approx
 
-data_path = "M1_E1.csv"
+data_path = "M1_E3.csv"
 
 if not exists(data_path):
     # Model Setup

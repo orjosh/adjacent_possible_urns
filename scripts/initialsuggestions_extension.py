@@ -2,6 +2,7 @@ import sys
 sys.path.append("scripts/")
 
 import random
+from analysisfuncs import choose_proportional_dict
 from adjacentpossible import AdjPosModel, UserUrn
 
 class ScoreboardQueue:
@@ -51,7 +52,8 @@ class InitialSuggestionsMdlExt:
     This model extension makes it so that all empty urns will start off with the IDs of the
     nu + 1 largest urns in the network in addition to any regular procedures.
     """
-    def __init__(self, n_to_suggest, ls_urns):
+    def __init__(self, n_to_suggest, ls_urns, mu):
+        self.novelty = mu
         self.suggestions = ScoreboardQueue(n_to_suggest)
 
         scoreboard = []
@@ -85,11 +87,14 @@ class InitialSuggestionsMdlExt:
                 model.total_size += 1
 
             # new part
-            suggested_ids = self.suggestions.get_scoreboard_as_list()
-            for u in suggested_ids:
-                # receiver.contacts[u] = 1 # NOTE import distinction here, not increasing n_contacts, just exposing her to u
-                # print(f"Adding {u} to {receiver.ID}\n{receiver}")
-                receiver.add_contact(u)
+            total_size = 0
+            for u in self.suggestions.id_size_dict:
+                #print(f"adding {self.suggestions.id_size_dict[u]}")
+                total_size += self.suggestions.id_size_dict[u]
+            
+            for i in range(self.novelty + 1):
+                urn_id = choose_proportional_dict(self.suggestions.id_size_dict, total_size)
+                receiver.add_contact(urn_id)
                 model.urn_sizes[receiver.ID] = receiver.size
                 model.prop_choice.append(receiver.ID)
                 model.total_size += 1
