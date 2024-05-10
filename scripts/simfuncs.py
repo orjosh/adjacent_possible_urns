@@ -19,7 +19,7 @@ def generate_initial_urns(novelty):
 
     return urns
 
-def run_model(model_instance, n_steps, custom_timestep=None, print_msg=None):
+def run_model(model_instance, n_steps, custom_timestep=None, custom_reinforcement=None, print_msg=None):
     csv_rows = []
     for i in range(n_steps):
         if print_msg:
@@ -28,12 +28,29 @@ def run_model(model_instance, n_steps, custom_timestep=None, print_msg=None):
             print(f"Step {i+1}/{n_steps}\tNo. urns: {model_instance.n_urns}")
 
         if custom_timestep:
-            custom_timestep()
+            custom_timestep(t_step=i)
+        elif custom_reinforcement:
+            model_instance.time_step(alt_reinforcement=custom_reinforcement)
         else:
             model_instance.time_step()
 
         last_event = model_instance.events[i]
         csv_rows.append((last_event[0], last_event[1], model_instance.n_urns))
+
+    return csv_rows
+
+def run_model_n_urns(model_instance, n_urns):
+    csv_rows = []
+    i = 0
+    while model_instance.n_urns < n_urns:
+        print(f"Step {i+1}, No. urns: {model_instance.n_urns}/{n_urns}")
+
+        model_instance.time_step()
+
+        last_event = model_instance.events[i]
+        csv_rows.append((last_event[0], last_event[1], model_instance.n_urns))
+
+        i += 1
 
     return csv_rows
 

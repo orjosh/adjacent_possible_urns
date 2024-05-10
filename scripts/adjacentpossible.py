@@ -54,6 +54,12 @@ class AdjPosModel:
 
         random.seed(rng_seed)
 
+    def _add_contact_update_size(self, urn1, urn2_id):
+        urn1.add_contact(urn2_id)
+        self.urn_sizes[urn1.ID] = urn1.size
+        self.total_size += 1
+        self.prop_choice.append(urn1.ID)
+
     def _get_calling_urn(self):
         r = random.randint(0, self.total_size-1)
         return self.prop_choice[r]
@@ -72,27 +78,15 @@ class AdjPosModel:
             #print(f"iter {i+1}/{num_iter}\nHave: {urn_a_contacts} of size {urn_a.n_contacts} (vs. {len(urn_a_contacts)})")
             drawn_id = choose_proportional_dict(urn_a_contacts, urn_a_size)
 
-            # otherwise,
-            urn_b.add_contact(drawn_id)
-            self.urn_sizes[urn_b.ID] = urn_b.size
-            self.prop_choice.append(urn_b.ID)
-            self.total_size += 1
+            self._add_contact_update_size(urn_b, drawn_id)
 
             urn_a_size -= urn_a_contacts[drawn_id]
             urn_a_contacts.pop(drawn_id)
 
     def do_reinforcement(self, caller, receiver):
         for i in range(self.reinforcement_param):
-            caller.add_contact(receiver.ID)
-            receiver.add_contact(caller.ID)
-
-            self.urn_sizes[caller.ID] = caller.size
-            self.prop_choice.append(caller.ID)
-
-            self.urn_sizes[receiver.ID] = receiver.size
-            self.prop_choice.append(receiver.ID)
-
-            self.total_size += 2
+            self._add_contact_update_size(caller, receiver.ID)
+            self._add_contact_update_size(receiver, caller.ID)
 
     def do_novelty(self, caller, receiver):
         """
@@ -108,10 +102,8 @@ class AdjPosModel:
                 self.urns.append(new_urn)
                 self.urn_sizes[new_urn.ID] = 0
                 self.n_urns += 1
-                receiver.add_contact(new_urn.ID)
-                self.urn_sizes[receiver.ID] = receiver.size
-                self.prop_choice.append(receiver.ID)
-                self.total_size += 1
+                
+                self._add_contact_update_size(receiver, new_urn.ID)
 
         # check if first-time interaction
         lower = None
