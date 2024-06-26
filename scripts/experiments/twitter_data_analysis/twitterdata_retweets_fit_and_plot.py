@@ -14,6 +14,7 @@ datasets, filenames = af.load_all_csvs("twitter_data/", pattern="retweeted_freq_
 # Get the frequency counts as lists
 freq_lists = {}
 for i, df in enumerate(datasets):
+    print(filenames[i])
     freqs = df["freq"].to_list()
     freq_lists[filenames[i]] = freqs
 
@@ -29,7 +30,7 @@ for i, freqs in enumerate(freq_lists.values()):
     # fig.set_size_inches(10, 6)
 
     # this_fit.plot_ccdf(ax=ax, label="Data", linestyle=':', marker='o')
-    # this_fit.power_law.plot_ccdf(ax=ax, linestyle="--", linewidth=2, label="Power-law")
+    # this_fit.power_law.plot_ccdf(ax=ax, linestyle="--", linewidth=2, label=r"Power-law ($\gamma$=" + f"{this_fit.power_law.alpha:.2f})")
     # this_fit.lognormal.plot_ccdf(ax=ax, linestyle="--", linewidth=2, label="Lognormal")
     # this_fit.truncated_power_law.plot_ccdf(ax=ax, linestyle="--", linewidth=2, label="Truncated power-law")
 
@@ -61,7 +62,7 @@ for i, freqs in enumerate(freq_lists.values()):
         'param2': second_params, 'param2_name': second_params_names}
 
     df = pd.DataFrame(data=d)
-    df.to_csv(f"figures/{name}_fit_params.csv")
+    df.to_csv(f"twitter_data/{name}_fit_params.csv")
 
     print(name)
     print(f"{this_fit.truncated_power_law.parameter1_name} = {this_fit.truncated_power_law.parameter1}")

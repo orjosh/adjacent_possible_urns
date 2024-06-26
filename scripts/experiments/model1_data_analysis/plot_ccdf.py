@@ -2,11 +2,11 @@ import powerlaw
 import pickle
 from matplotlib import pyplot as plt
 import sys
-sys.path.append("scripts/")
+sys.path.append("./scripts")
 import analysisfuncs as af
 
 # Load all datasets (sequence of (caller, receiver) events)
-datasets, filenames = af.load_all_csvs("generated_data/", pattern="adjpos_orig_wsw_rho_change*")
+datasets, filenames = af.load_all_csvs("generated_data/", pattern="adjpos_orig_wsw_*")
 
 # Calculate freqs as list of receivers
 freq_lists = {}
@@ -21,7 +21,7 @@ for i, df in enumerate(datasets):
             freqs[x] += 1
 
     freq_lists[filenames[i]] = list(freqs.values())
-    print(list(freqs.values()))
+    #print(list(freqs.values()))
 
 # Fit to the data
 all_fits = {}
@@ -35,7 +35,11 @@ for i, freqs in enumerate(freq_lists.values()):
 
     this_fit.plot_ccdf(ax=ax, linestyle='--', marker='o', label="Data")
     this_fit.power_law.plot_ccdf(ax=ax, linestyle="--", linewidth=2, label=r"Power-law ($\gamma$=" + f"{this_fit.power_law.alpha:.2f})")
-    this_fit.lognormal.plot_ccdf(ax=ax, linestyle=":", linewidth=2, label=r"Lognormal ($\mu, \sigma =$" + f"{this_fit.lognormal.mu:.2f}, {this_fit.lognormal.sigma:.2f})")
+    this_fit.lognormal.plot_ccdf(ax=ax, linestyle="--", linewidth=2, label="Lognormal")
+    this_fit.truncated_power_law.plot_ccdf(ax=ax, linestyle="--", linewidth=2, label="Truncated power-law")
+
+    print(f"KS (Trunc.): {this_fit.truncated_power_law.KS()}")
+    print(f"Trunc. vs PL: {this_fit.distribution_compare("truncated_power_law", "power_law")}")
 
     ax.set_title(name)
     ax.set_xscale('log')
@@ -46,5 +50,5 @@ for i, freqs in enumerate(freq_lists.values()):
     ax.legend()
 
     plt.show()
-    fig.savefig("figures/" + name + "_indegfit.png")
+    fig.savefig("figures/Tria Model" + name + "_indegfit.png")
     fig.clear()

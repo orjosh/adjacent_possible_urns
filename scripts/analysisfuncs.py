@@ -9,7 +9,7 @@ from pathlib import Path
 from math import log, sqrt, exp
 from scipy.special import zeta, erfc
 from typing import Dict
-from edugalt_TwitterHashtags_src.modules_distributor import fit
+#from edugalt_TwitterHashtags_src.modules_distributor import fit
 
 def fit_and_pickle(data_lists, data_names, pickle_filename):
     all_fits = {}
@@ -29,29 +29,29 @@ def fit_and_pickle(data_lists, data_names, pickle_filename):
     with open(pickle_filename, 'wb') as f:
         pickle.dump(all_fits, f)
 
-def fit_and_pickle_eduardo(data_lists, data_names, models_ls, nreps, pickle_filename):
-    all_fits = {}
+# def fit_and_pickle_eduardo(data_lists, data_names, models_ls, nreps, pickle_filename):
+#     all_fits = {}
 
-    if not pickle_filename.endswith(".pickle"):
-        pickle_filename = pickle_filename + ".pickle"
+#     if not pickle_filename.endswith(".pickle"):
+#         pickle_filename = pickle_filename + ".pickle"
 
-    if exists(pickle_filename):
-        ans = input(f"Warning! \'{pickle_filename}\' already exists! Type \'OVERWRITE\' to proceed anyway.")
-        if ans != "OVERWRITE":
-            return
+#     if exists(pickle_filename):
+#         ans = input(f"Warning! \'{pickle_filename}\' already exists! Type \'OVERWRITE\' to proceed anyway.")
+#         if ans != "OVERWRITE":
+#             return
 
-    for i, ls in enumerate(data_lists):
-        this_dataset_fits = {}
-        for j, model in enumerate(models_ls):
-            print(f"Fitting (dataset {i+1}/{len(data_lists)}, model ({j+1}/{len(models_ls)})", end='\r')
-            res = fit(model = model, counts = ls, nrep = nreps)
-            this_model = {"parameters": res[0], "-loglikelihood": res[1]}
-            this_dataset_fits[model] = this_model
+#     for i, ls in enumerate(data_lists):
+#         this_dataset_fits = {}
+#         for j, model in enumerate(models_ls):
+#             print(f"Fitting (dataset {i+1}/{len(data_lists)}, model ({j+1}/{len(models_ls)})", end='\r')
+#             res = fit(model = model, counts = ls, nrep = nreps)
+#             this_model = {"parameters": res[0], "-loglikelihood": res[1]}
+#             this_dataset_fits[model] = this_model
 
-        all_fits[data_names[i]] = this_dataset_fits
+#         all_fits[data_names[i]] = this_dataset_fits
     
-    with open(pickle_filename, 'wb') as f:
-        pickle.dump(all_fits, f)
+#     with open(pickle_filename, 'wb') as f:
+#         pickle.dump(all_fits, f)
             
 
 def load_all_csvs(folder, pattern=None):
@@ -169,10 +169,11 @@ def power_law_distributed_rng(n, x_min, scale, seed=None):
     # This algorithm is taken from Appendix D in Clauset et al's"Power Law Distributions
     # in Empirical Data", SIAM Review, Vol 51 (4), pp. 661-703
     rng = np.random.default_rng(seed)
-    sample = rng.random((n,1))
+    rands = rng.random((n,1))
+    sample = []
     for i in range(n):
-        r = sample[i]
-        sample[i] = x_min * (1-r)**(-1/(scale-1))
+        r = rands[i][0]
+        sample.append(x_min * (1-r)**(-1/(scale-1)))
     return sorted(sample)
 
 def continuous_power_mle(data, x_min): # Deprecated, use Eduardo et. al's code
